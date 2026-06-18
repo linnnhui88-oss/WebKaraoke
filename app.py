@@ -8,6 +8,7 @@ import os
 import socket
 import threading
 import time
+import uuid
 from flask import Flask, request, jsonify, render_template
 
 from config import *
@@ -53,6 +54,60 @@ app = Flask(__name__)
 queue_mgr = QueueManager()
 player = MusicPlayer()
 searcher = MusicSearcher()
+tasks_lock = threading.RLock()
+download_tasks = {}
+
+
+def create_task(user_id, user_name, candidate):
+    task_id = uuid.uuid4().hex
+    now = time.time()
+    task = {
+        'id': task_id,
+        'user_id': user_id,
+        'user_name': user_name,
+        'candidate': candidate,
+        'status': 'pending',
+        'message': '等待下载',
+        'created_at': now,
+        'updated_at': now,
+    }
+    with tasks_lock:
+        download_tasks[task_id] = task
+        cleanup_tasks_locked()
+    return task
+
+
+def update_task(task_id, status, message, **extra):
+    with tasks_lock:
+        task = download_tasks.get(task_id)
+        if not task:
+            return
+        task.update(extra)
+        task['status'] = status
+        task['message'] = message
+        task['updated_at'] = time.time()
+
+
+def cleanup_tasks_locked():
+    if len(download_tasks) <= 50:
+        return
+    oldest = sorted(download_tasks.values(), key=lambda item: item['created_at'])
+    for task in oldest[:-50]:
+        download_tasks.pop(task['id'], None)
+
+
+def public_task(task):
+    candidate = task.get('candidate') or {}
+    return {
+        'id': task.get('id'),
+        'status': task.get('status'),
+        'message': task.get('message'),
+        'song_name': candidate.get('name', ''),
+        'artist': candidate.get('artist', ''),
+        'user_name': task.get('user_name', '匿名'),
+        'created_at': task.get('created_at'),
+        'updated_at': task.get('updated_at'),
+    }
 
 # ==================== 前端页面 ====================
 
@@ -134,9 +189,16 @@ def api_request():
                 'error': '正在下载中，请稍候再试...'
             })
 
+        task = create_task(user_id, user_name, candidate)
+
         def do_download():
+            update_task(task['id'], 'downloading', '正在下载音频')
             result = searcher.download_candidate(candidate)
-            if result:
+            if not result:
+                update_task(task['id'], 'failed', '下载失败，请换一个候选或稍后重试')
+                return
+
+            try:
                 was_empty = len(queue_mgr.get_queue()) == 0 and not player.is_playing
                 song = queue_mgr.add_to_queue(
                     user_id=user_id,
@@ -146,17 +208,23 @@ def api_request():
                     user_name=user_name
                 )
                 if song:
+                    update_task(task['id'], 'queued', '已加入播放队列', song_id=song['id'])
                     if was_empty:
                         player.skip_event.set()
                         print(f"[搜索] 立即播放: {result['name']}")
                     else:
                         print(f"[搜索] 已加入队列: {result['name']}")
+                else:
+                    update_task(task['id'], 'failed', '加入队列失败，可能已达到限制')
+            except Exception as exc:
+                update_task(task['id'], 'failed', f'加入队列失败: {exc}')
 
         thread = threading.Thread(target=do_download, daemon=True)
         thread.start()
 
         return jsonify({
             'ok': True,
+            'task': public_task(task),
             'message': '正在下载，完成后将自动加入队列',
             'remaining': queue_mgr.get_today_remaining(user_id)
         })
@@ -166,6 +234,20 @@ def api_request():
         print(f"[点歌] 异常: {e}")
         traceback.print_exc()
         return jsonify({'ok': False, 'error': f'点歌失败: {str(e)}'}), 500
+
+
+@app.route('/api/tasks', methods=['GET'])
+def api_tasks():
+    """查看最近下载任务。"""
+    user_id = request.args.get('user_id', '')
+    with tasks_lock:
+        tasks = list(download_tasks.values())
+    if user_id:
+        tasks = [task for task in tasks if task.get('user_id') == user_id]
+    tasks.sort(key=lambda item: item.get('created_at', 0), reverse=True)
+    return jsonify({
+        'tasks': [public_task(task) for task in tasks[:10]]
+    })
 
 
 @app.route('/api/queue', methods=['GET'])

@@ -3,6 +3,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
         let logs = [];
         let isAdmin = !!localStorage.getItem('adminToken');
         let searchCandidates = [];
+        let taskPollTimer = null;
         updateAdminUI();
 
         // 主题切换
@@ -110,6 +111,56 @@ let userId = localStorage.getItem('userId') || generateUserId();
             `;
         }
 
+        function taskStatusText(status) {
+            const names = {
+                pending: '等待中',
+                downloading: '下载中',
+                queued: '已入队',
+                failed: '失败'
+            };
+            return names[status] || status || '未知';
+        }
+
+        function renderTasks(tasks) {
+            const panel = document.getElementById('taskPanel');
+            if (!tasks || tasks.length === 0) {
+                panel.classList.remove('active');
+                panel.innerHTML = '';
+                return;
+            }
+
+            panel.classList.add('active');
+            panel.innerHTML = `
+                <ul class="task-list">
+                    ${tasks.map(task => `
+                        <li class="task-item">
+                            <div>
+                                <div class="task-title">${escapeHtml(task.song_name || '未知歌曲')}</div>
+                                <div class="task-message">${escapeHtml(task.message || '')}</div>
+                            </div>
+                            <span class="task-status ${escapeHtml(task.status)}">${escapeHtml(taskStatusText(task.status))}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
+
+        async function refreshTasks() {
+            try {
+                const resp = await fetch(`/api/tasks?user_id=${encodeURIComponent(userId)}`);
+                const data = await resp.json();
+                renderTasks(data.tasks || []);
+            } catch (e) {
+                console.error('刷新任务失败:', e);
+            }
+        }
+
+        function startTaskPolling() {
+            refreshTasks();
+            if (taskPollTimer) return;
+            taskPollTimer = setInterval(refreshTasks, 3000);
+        }
+
         async function searchSong() {
             const input = document.getElementById('songInput');
             const btn = document.getElementById('searchBtn');
@@ -178,6 +229,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                     document.getElementById('songInput').value = '';
                     addLog(`开始下载: ${candidate.name}`, 'success');
                     showToast('正在下载，完成后将自动加入队列');
+                    startTaskPolling();
                     setTimeout(() => refreshQueue(), 5000);
                     setTimeout(() => refreshQueue(), 15000);
                     setTimeout(() => refreshHistory(), 20000);
@@ -430,6 +482,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
         // 每5秒自动刷新队列
         setInterval(refreshQueue, 5000);
         setInterval(refreshHistory, 10000);
+        startTaskPolling();
 
         // 页面加载时刷新
         refreshQueue();

@@ -165,6 +165,62 @@
             background: rgba(233,69,96,0.3);
         }
 
+        .task-panel {
+            display: none;
+            margin: 12px 0 20px;
+        }
+
+        .task-panel.active {
+            display: block;
+        }
+
+        .task-list {
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .task-title {
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .task-message {
+            margin-top: 3px;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+        }
+
+        .task-status {
+            flex-shrink: 0;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 0.75em;
+            background: rgba(52, 152, 219, 0.16);
+            color: #3498db;
+        }
+
+        .task-status.queued {
+            background: rgba(39, 174, 96, 0.16);
+            color: #27ae60;
+        }
+
+        .task-status.failed {
+            background: rgba(231, 76, 60, 0.16);
+            color: #e74c3c;
+        }
+
         .current-play {
             background: var(--card-bg);
             border-radius: 15px;
@@ -614,6 +670,10 @@
             .candidate-thumb {
                 width: 64px;
                 height: 48px;
+            }
+            .task-item {
+                align-items: flex-start;
+                flex-direction: column;
             }
             .stats {
                 flex-direction: column;
