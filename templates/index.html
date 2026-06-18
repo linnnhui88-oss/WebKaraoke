@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>
+    <div class="connection-banner" id="connectionBanner">服务器连接异常，正在等待恢复</div>
     <div class="container">
         <div class="header">
             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -45,6 +46,7 @@
             <div class="label">▶️ 正在播放</div>
             <div class="song-name" id="currentName">-</div>
             <div class="artist" id="currentArtist">-</div>
+            <div class="requester" id="currentRequester">-</div>
         </div>
 
         <div class="section-title">📋 播放队列</div>

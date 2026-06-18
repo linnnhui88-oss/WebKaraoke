@@ -54,6 +54,13 @@ let userId = localStorage.getItem('userId') || generateUserId();
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
+        function setOnlineStatus(isOnline) {
+            const banner = document.getElementById('connectionBanner');
+            if (banner) {
+                banner.classList.toggle('show', !isOnline);
+            }
+        }
+
         function addLog(msg, type = 'info') {
             const now = new Date();
             const time = now.toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
@@ -149,8 +156,10 @@ let userId = localStorage.getItem('userId') || generateUserId();
             try {
                 const resp = await fetch(`/api/tasks?user_id=${encodeURIComponent(userId)}`);
                 const data = await resp.json();
+                setOnlineStatus(true);
                 renderTasks(data.tasks || []);
             } catch (e) {
+                setOnlineStatus(false);
                 console.error('刷新任务失败:', e);
             }
         }
@@ -187,6 +196,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                 });
 
                 const data = await resp.json();
+                setOnlineStatus(true);
 
                 if (data.ok) {
                     renderCandidates(data.candidates || []);
@@ -197,6 +207,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                     showToast(data.error || '点歌失败', true);
                 }
             } catch (e) {
+                setOnlineStatus(false);
                 addLog(`网络错误: ${e.message}`, 'error');
                 showToast('网络错误，请重试', true);
             } finally {
@@ -224,6 +235,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                     })
                 });
                 const data = await resp.json();
+                setOnlineStatus(true);
                 if (data.ok) {
                     renderCandidates([]);
                     document.getElementById('songInput').value = '';
@@ -247,6 +259,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
             try {
                 const resp = await fetch(`/api/queue?user_id=${encodeURIComponent(userId)}`);
                 const data = await resp.json();
+                setOnlineStatus(true);
 
                 // 更新正在播放
                 const currentPlay = document.getElementById('currentPlay');
@@ -254,6 +267,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                     currentPlay.classList.add('active');
                     document.getElementById('currentName').textContent = data.current.current_song.name;
                     document.getElementById('currentArtist').textContent = data.current.current_song.artist;
+                    document.getElementById('currentRequester').textContent = `点歌人: ${data.current.current_song.user_name || '匿名'}`;
                 } else {
                     currentPlay.classList.remove('active');
                 }
@@ -293,6 +307,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                 document.getElementById('remainingCount').textContent = data.stats.remaining;
 
             } catch (e) {
+                setOnlineStatus(false);
                 console.error('刷新队列失败:', e);
             }
         }
@@ -301,6 +316,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
             try {
                 const resp = await fetch('/api/history');
                 const data = await resp.json();
+                setOnlineStatus(true);
                 const history = data.history || [];
 
                 const list = document.getElementById('historyList');
@@ -324,6 +340,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
                     `;
                 }).join('');
             } catch (e) {
+                setOnlineStatus(false);
                 console.error('刷新历史失败:', e);
             }
         }
@@ -488,6 +505,14 @@ let userId = localStorage.getItem('userId') || generateUserId();
         setInterval(refreshQueue, 5000);
         setInterval(refreshHistory, 10000);
         startTaskPolling();
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                refreshQueue();
+                refreshHistory();
+                refreshTasks();
+            }
+        });
 
         // 页面加载时刷新
         refreshQueue();

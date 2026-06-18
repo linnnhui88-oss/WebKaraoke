@@ -36,6 +36,23 @@
             transition: all 0.3s ease;
         }
 
+        .connection-banner {
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 1500;
+            padding: 10px 16px;
+            text-align: center;
+            background: #e74c3c;
+            color: #fff;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .connection-banner.show {
+            display: block;
+        }
+
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -247,6 +264,12 @@
         .current-play .artist {
             color: var(--text-secondary);
             margin-top: 5px;
+        }
+
+        .current-play .requester {
+            color: var(--text-secondary);
+            margin-top: 6px;
+            font-size: 0.85em;
         }
 
         .section-title {
@@ -659,6 +682,11 @@
             }
             .search-box {
                 flex-direction: column;
+                position: sticky;
+                top: 0;
+                z-index: 20;
+                padding: 10px 0;
+                background: var(--bg);
             }
             .candidate-item {
                 grid-template-columns: 64px 1fr;
