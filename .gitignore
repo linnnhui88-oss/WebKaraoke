@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# Data files (auto-generated)
+daily_counts.json
+play_history.json
+playlist.json
+
+# Temp files
+*.tmp
+*.log
