@@ -5,8 +5,10 @@ Web 版点歌系统，浏览器打开即用
 
 import sys
 import os
+import logging
 import secrets
 import socket
+import subprocess
 import threading
 import time
 import uuid
@@ -16,6 +18,22 @@ from config import *
 from queue_manager import QueueManager
 from player import MusicPlayer
 from music_search import MusicSearcher
+
+
+# ==================== 日志 ====================
+
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(os.path.join(LOG_DIR, "app.log"), encoding='utf-8')
+    ]
+)
+logger = logging.getLogger("webkaraoke")
 
 
 # ==================== 编码兼容 ====================
@@ -192,7 +210,7 @@ def api_search():
         query = clean_text(data.get('query'), 100)
         user_id = clean_text(data.get('user_id'), 64)
 
-        print(f"[搜索] 收到请求: query={query}")
+        logger.info("[搜索] 收到请求: query=%s", query)
 
         if not query:
             return jsonify({'ok': False, 'error': '请输入歌名'})
@@ -228,7 +246,7 @@ def api_search():
 
     except Exception as e:
         import traceback
-        print(f"[搜索] 异常: {e}")
+        logger.exception("[搜索] 异常: %s", e)
         traceback.print_exc()
         return jsonify({'ok': False, 'error': f'搜索失败: {str(e)}'}), 500
 
@@ -284,9 +302,9 @@ def api_request():
                     update_task(task['id'], 'queued', '已加入播放队列', song_id=song['id'])
                     if was_empty:
                         player.skip_event.set()
-                        print(f"[搜索] 立即播放: {result['name']}")
+                        logger.info("[搜索] 立即播放: %s", result['name'])
                     else:
-                        print(f"[搜索] 已加入队列: {result['name']}")
+                        logger.info("[搜索] 已加入队列: %s", result['name'])
                 else:
                     update_task(task['id'], 'failed', '加入队列失败，可能已达到限制')
             except Exception as exc:
@@ -304,7 +322,7 @@ def api_request():
 
     except Exception as e:
         import traceback
-        print(f"[点歌] 异常: {e}")
+        logger.exception("[点歌] 异常: %s", e)
         traceback.print_exc()
         return jsonify({'ok': False, 'error': f'点歌失败: {str(e)}'}), 500
 
@@ -340,6 +358,38 @@ def api_history():
     limit = request.args.get('limit', 20, type=int)
     return jsonify({
         'history': queue_mgr.get_history(limit)
+    })
+
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """服务健康检查。"""
+    yt_dlp_available = False
+    yt_dlp_version = ''
+    try:
+        result = subprocess.run(
+            [sys.executable, '-m', 'yt_dlp', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        yt_dlp_available = result.returncode == 0
+        yt_dlp_version = result.stdout.strip().splitlines()[0] if result.stdout.strip() else ''
+    except Exception:
+        yt_dlp_available = False
+
+    status = player.get_status()
+    stats = queue_mgr.get_stats()
+    return jsonify({
+        'ok': True,
+        'mpv_available': player.mpv_available,
+        'mpv_path': player.mpv_path,
+        'yt_dlp_available': yt_dlp_available,
+        'yt_dlp_version': yt_dlp_version,
+        'downloading': searcher._downloading,
+        'queue_length': stats['queue_length'],
+        'is_playing': status['is_playing'],
+        'current_song': status['current_song'],
     })
 
 

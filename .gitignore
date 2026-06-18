@@ -21,3 +21,4 @@ playlist.json
 # Temp files
 *.tmp
 *.log
+logs/

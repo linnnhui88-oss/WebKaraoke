@@ -113,6 +113,7 @@ python -c "import soundcard; [print(s.name) for s in soundcard.all_speakers()]"
 | POST | `/api/search` | 搜索并点歌，参数：`{query, user_id, user_name}` |
 | GET | `/api/queue` | 获取当前队列和播放状态 |
 | GET | `/api/history` | 获取播放历史，参数：`?limit=20` |
+| GET | `/api/health` | 健康检查，包含 mpv、yt-dlp、队列和播放状态 |
 | POST | `/api/remove` | 删除队列中的歌曲，参数：`{song_id}` |
 | POST | `/api/skip` | 跳过当前歌曲 |
 | POST | `/api/clear` | 清空队列 |
@@ -123,6 +124,7 @@ python -c "import soundcard; [print(s.name) for s in soundcard.all_speakers()]"
 2. 下载的音频保存在 `%TEMP%\jukebox\` 目录，会按配置自动复用和清理
 3. 当前只允许一个下载任务，需要等待当前下载完成后再点下一首
 4. mpv 路径会自动搜索 scoop 安装路径
+5. 运行日志写入 `logs/app.log`，该目录不会提交到 Git
 
 ## 常见问题
 
