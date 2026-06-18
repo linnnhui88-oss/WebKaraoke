@@ -56,6 +56,8 @@ python app.py
 | `MAX_SONGS_PER_USER_PER_DAY` | 每日每人限点 | 10 |
 | `MAX_SONG_DURATION` | 每首歌最长播放时间(秒)，0 表示不限制 | 0 |
 | `MAX_QUEUE_SIZE` | 队列最大容量 | 500 |
+| `CACHE_MAX_SIZE_MB` | 下载音频缓存最大占用空间(MB) | 2048 |
+| `CACHE_MAX_AGE_DAYS` | 下载音频缓存最大保留天数 | 14 |
 | `BLUETOOTH_SPEAKER` | 蓝牙音响设备名 | 空(默认设备) |
 
 ## 功能特性
@@ -72,7 +74,7 @@ python app.py
 
 1. **音频来源**: 使用 YouTube 搜索，需要网络能访问 YouTube
 2. **下载限制**: 单个音频文件限制 5MB
-3. **缓存**: 下载的音频保存在 `%TEMP%\jukebox\` 目录
+3. **缓存**: 下载的音频保存在 `%TEMP%\jukebox\` 目录，会按配置自动复用和清理
 4. **mpv 路径**: 自动搜索 scoop 安装路径
 
 ## 常见问题

@@ -86,6 +86,8 @@ WebKaraoke/
 | `MAX_SONG_DURATION` | 每首歌最长播放时间(秒)，0 表示不限制 | 0 |
 | `MAX_QUEUE_SIZE` | 队列最大容量 | 500 |
 | `SAME_SONG_COOLDOWN` | 同一首歌最小间隔(秒) | 3600 |
+| `CACHE_MAX_SIZE_MB` | 下载音频缓存最大占用空间(MB) | 2048 |
+| `CACHE_MAX_AGE_DAYS` | 下载音频缓存最大保留天数 | 14 |
 | `BLUETOOTH_SPEAKER` | 蓝牙音响设备名 | 空(默认设备) |
 | `WEBKARAOKE_ADMIN_PASSWORD` | 管理员密码环境变量 | 123456 |
 | `PORT` | 服务端口 | 9800 |
@@ -116,7 +118,7 @@ python -c "import soundcard; [print(s.name) for s in soundcard.all_speakers()]"
 ## 注意事项
 
 1. 音频来源使用 YouTube，需要网络能访问 YouTube
-2. 下载的音频保存在 `%TEMP%\jukebox\` 目录
+2. 下载的音频保存在 `%TEMP%\jukebox\` 目录，会按配置自动复用和清理
 3. 当前只允许一个下载任务，需要等待当前下载完成后再点下一首
 4. mpv 路径会自动搜索 scoop 安装路径
 

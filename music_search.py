@@ -10,6 +10,7 @@ import time
 import os
 import tempfile
 import shutil
+from config import CACHE_MAX_AGE_DAYS, CACHE_MAX_SIZE_MB
 
 
 def find_mpv():
@@ -30,6 +31,47 @@ class MusicSearcher:
         os.makedirs(self._temp_dir, exist_ok=True)
         self.mpv_path = find_mpv()
         self._downloading = False
+        self.cleanup_cache()
+
+    def cleanup_cache(self):
+        """清理过期或超出大小限制的音频缓存。"""
+        try:
+            now = time.time()
+            max_age = max(0, CACHE_MAX_AGE_DAYS) * 86400
+            max_size = max(0, CACHE_MAX_SIZE_MB) * 1024 * 1024
+            files = []
+
+            for name in os.listdir(self._temp_dir):
+                path = os.path.join(self._temp_dir, name)
+                if not os.path.isfile(path):
+                    continue
+                if not name.lower().endswith(('.m4a', '.mp3', '.webm', '.opus')):
+                    continue
+
+                stat = os.stat(path)
+                if max_age and now - stat.st_mtime > max_age:
+                    os.remove(path)
+                    continue
+                files.append({'path': path, 'size': stat.st_size, 'mtime': stat.st_mtime})
+
+            if not max_size:
+                return
+
+            total_size = sum(item['size'] for item in files)
+            if total_size <= max_size:
+                return
+
+            for item in sorted(files, key=lambda file_info: file_info['mtime']):
+                if total_size <= max_size:
+                    break
+                try:
+                    os.remove(item['path'])
+                    total_size -= item['size']
+                except OSError:
+                    pass
+
+        except Exception as e:
+            print(f"[缓存] 清理失败: {e}")
 
     def search(self, query):
         """搜索歌曲并下载第一个候选，保留旧调用方式。"""
@@ -130,6 +172,8 @@ class MusicSearcher:
             output_file = os.path.join(self._temp_dir, f"{video_id}.m4a")
 
             if os.path.exists(output_file) and os.path.getsize(output_file) > 100000:
+                os.utime(output_file, None)
+                print(f"[缓存] 命中: {title}")
                 return {'name': title, 'artist': uploader, 'url': output_file}
 
             # 用 yt-dlp 直接下载（它会自动处理重定向和 cookies）
@@ -157,6 +201,7 @@ class MusicSearcher:
             if os.path.exists(output_file) and os.path.getsize(output_file) > 100000:
                 size_mb = os.path.getsize(output_file) / (1024 * 1024)
                 print(f"[搜索] 完成: {size_mb:.1f} MB")
+                self.cleanup_cache()
                 return {'name': title, 'artist': uploader, 'url': output_file}
 
             print("[搜索] 下载失败")
