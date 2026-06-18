@@ -114,6 +114,7 @@ python -c "import soundcard; [print(s.name) for s in soundcard.all_speakers()]"
 | GET | `/api/queue` | 获取当前队列和播放状态 |
 | GET | `/api/history` | 获取播放历史，参数：`?limit=20` |
 | GET | `/api/health` | 健康检查，包含 mpv、yt-dlp、队列和播放状态 |
+| GET | `/api/playback_events` | 获取最近播放事件，包含完成、跳过、失败等状态 |
 | POST | `/api/remove` | 删除队列中的歌曲，参数：`{song_id}` |
 | POST | `/api/skip` | 跳过当前歌曲 |
 | POST | `/api/clear` | 清空队列 |

@@ -128,6 +128,16 @@ let userId = localStorage.getItem('userId') || generateUserId();
             return names[status] || status || '未知';
         }
 
+        function eventStatusText(status) {
+            const names = {
+                completed: '完成',
+                skipped: '跳过',
+                stopped: '停止',
+                failed: '失败'
+            };
+            return names[status] || status || '未知';
+        }
+
         function renderTasks(tasks) {
             const panel = document.getElementById('taskPanel');
             if (!tasks || tasks.length === 0) {
@@ -168,6 +178,38 @@ let userId = localStorage.getItem('userId') || generateUserId();
             refreshTasks();
             if (taskPollTimer) return;
             taskPollTimer = setInterval(refreshTasks, 3000);
+        }
+
+        async function refreshPlaybackEvents() {
+            try {
+                const resp = await fetch('/api/playback_events?limit=8');
+                const data = await resp.json();
+                setOnlineStatus(true);
+                const events = data.events || [];
+                const list = document.getElementById('eventList');
+                document.getElementById('eventCount').textContent = events.length;
+
+                if (events.length === 0) {
+                    list.innerHTML = '<li class="empty-state">暂无播放事件</li>';
+                    return;
+                }
+
+                list.innerHTML = events.map(event => {
+                    const song = event.song || {};
+                    return `
+                        <li class="event-item ${escapeHtml(event.status)}">
+                            <span class="event-status">${escapeHtml(eventStatusText(event.status))}</span>
+                            <div class="info">
+                                <div class="name">${escapeHtml(song.name || '未知歌曲')}</div>
+                                <div class="meta">${escapeHtml(event.message || '')} · ${escapeHtml(song.user_name || '匿名')}</div>
+                            </div>
+                        </li>
+                    `;
+                }).join('');
+            } catch (e) {
+                setOnlineStatus(false);
+                console.error('刷新播放事件失败:', e);
+            }
         }
 
         async function searchSong() {
@@ -504,6 +546,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
         // 每5秒自动刷新队列
         setInterval(refreshQueue, 5000);
         setInterval(refreshHistory, 10000);
+        setInterval(refreshPlaybackEvents, 10000);
         startTaskPolling();
 
         document.addEventListener('visibilitychange', () => {
@@ -511,9 +554,11 @@ let userId = localStorage.getItem('userId') || generateUserId();
                 refreshQueue();
                 refreshHistory();
                 refreshTasks();
+                refreshPlaybackEvents();
             }
         });
 
         // 页面加载时刷新
         refreshQueue();
         refreshHistory();
+        refreshPlaybackEvents();

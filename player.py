@@ -53,6 +53,7 @@ class MusicPlayer:
         self.stop_event = threading.Event()
         self.skip_event = threading.Event()
         self._lock = threading.Lock()
+        self.recent_events = []
         self.mpv_path = None
         self.mpv_available = False
 
@@ -112,6 +113,7 @@ class MusicPlayer:
         """播放一首歌"""
         if not self.mpv_available:
             print(f"[播放器] ⚠️ mpv 不可用，跳过: {song['name']}")
+            self._add_event('failed', song, 'mpv 不可用，已跳过')
             return
 
         with self._lock:
@@ -120,6 +122,9 @@ class MusicPlayer:
 
         print(f"▶️ 正在播放: {song['name']} - {song['artist']} "
               f"(点歌人: {song.get('user_name', '未知')})")
+
+        outcome = 'completed'
+        message = '播放完成'
 
         try:
             # 构建 mpv 命令
@@ -164,29 +169,63 @@ class MusicPlayer:
                     print(f"⏭️ 跳过: {song['name']}")
                     self.current_process.kill()
                     self.skip_event.clear()
+                    outcome = 'skipped'
+                    message = '管理员切歌'
                     break
 
                 # 检查是否被要求停止
                 if self.stop_event.is_set():
                     self.current_process.kill()
+                    outcome = 'stopped'
+                    message = '播放器停止'
                     break
 
                 # 超时保护
                 if time.time() - start_time > max_wait:
                     print(f"⏱️ 超时，强制结束: {song['name']}")
                     self.current_process.kill()
+                    outcome = 'failed'
+                    message = '播放超时，已跳过'
                     break
 
                 time.sleep(0.5)
 
+            if outcome == 'completed' and self.current_process.returncode not in (0, None):
+                outcome = 'failed'
+                message = f'mpv 退出码 {self.current_process.returncode}，已跳过'
+
         except Exception as e:
             print(f"[播放器] 播放异常: {e}")
+            outcome = 'failed'
+            message = f'播放异常: {e}'
 
         finally:
+            self._add_event(outcome, song, message)
             with self._lock:
                 self.current_process = None
                 self.current_song = None
                 self.is_playing = False
+
+    def _add_event(self, status, song, message):
+        """记录最近播放事件，供前端诊断展示。"""
+        event = {
+            'id': int(time.time() * 1000),
+            'status': status,
+            'message': message,
+            'song': {
+                'name': song.get('name'),
+                'artist': song.get('artist'),
+                'user_name': song.get('user_name', '未知'),
+            },
+            'time': time.time(),
+        }
+        with self._lock:
+            self.recent_events.insert(0, event)
+            self.recent_events = self.recent_events[:20]
+
+    def get_events(self, limit=10):
+        with self._lock:
+            return list(self.recent_events[:limit])
 
     def skip_current(self):
         """跳过当前歌曲"""

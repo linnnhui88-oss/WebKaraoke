@@ -393,6 +393,15 @@ def api_health():
     })
 
 
+@app.route('/api/playback_events', methods=['GET'])
+def api_playback_events():
+    """最近播放事件，用于展示失败、跳过、完成等状态。"""
+    limit = request.args.get('limit', 10, type=int)
+    return jsonify({
+        'events': player.get_events(limit)
+    })
+
+
 @app.route('/api/admin/login', methods=['POST'])
 def api_admin_login():
     """管理员登录，验证密码"""

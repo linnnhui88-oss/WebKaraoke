@@ -401,7 +401,12 @@
             list-style: none;
         }
 
-        .history-item {
+        .event-list {
+            list-style: none;
+        }
+
+        .history-item,
+        .event-item {
             display: flex;
             align-items: center;
             padding: 12px;
@@ -411,23 +416,39 @@
             font-size: 0.9em;
         }
 
-        .history-item .time {
+        .history-item .time,
+        .event-item .event-status {
             color: var(--text-secondary);
             font-size: 0.8em;
             width: 60px;
             flex-shrink: 0;
         }
 
-        .history-item .info {
+        .event-item.failed .event-status {
+            color: #e74c3c;
+        }
+
+        .event-item.skipped .event-status {
+            color: #f39c12;
+        }
+
+        .event-item.completed .event-status {
+            color: #27ae60;
+        }
+
+        .history-item .info,
+        .event-item .info {
             flex: 1;
             margin-left: 10px;
         }
 
-        .history-item .name {
+        .history-item .name,
+        .event-item .name {
             color: var(--text);
         }
 
-        .history-item .meta {
+        .history-item .meta,
+        .event-item .meta {
             color: var(--text-secondary);
             font-size: 0.85em;
         }
