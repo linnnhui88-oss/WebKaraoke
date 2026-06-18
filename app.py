@@ -5,6 +5,7 @@ Web 版点歌系统，浏览器打开即用
 
 import sys
 import os
+import secrets
 import socket
 import threading
 import time
@@ -42,7 +43,7 @@ def safe_print(*args, **kwargs):
 def require_admin():
     """验证请求是否来自管理员，返回 None 通过，或返回错误响应"""
     token = request.headers.get('X-Admin-Token', '')
-    if token != ADMIN_PASSWORD:
+    if not is_admin_token_valid(token):
         return jsonify({'ok': False, 'error': '需要管理员权限'}), 403
     return None
 
@@ -56,6 +57,10 @@ player = MusicPlayer()
 searcher = MusicSearcher()
 tasks_lock = threading.RLock()
 download_tasks = {}
+admin_sessions_lock = threading.RLock()
+admin_sessions = {}
+rate_limit_lock = threading.RLock()
+last_request_times = {}
 
 
 def create_task(user_id, user_name, candidate):
@@ -109,6 +114,66 @@ def public_task(task):
         'updated_at': task.get('updated_at'),
     }
 
+
+def clean_text(value, max_len, default=''):
+    text = str(value or '').strip()
+    if not text:
+        return default
+    return text[:max_len]
+
+
+def get_client_key(user_id):
+    remote = request.headers.get('X-Forwarded-For', request.remote_addr or '')
+    return f"{user_id or 'anonymous'}@{remote.split(',')[0].strip()}"
+
+
+def check_rate_limit(user_id, action):
+    key = f"{action}:{get_client_key(user_id)}"
+    now = time.time()
+    with rate_limit_lock:
+        last_time = last_request_times.get(key, 0)
+        if now - last_time < REQUEST_RATE_LIMIT_SECONDS:
+            return False
+        last_request_times[key] = now
+        # 控制内存占用
+        if len(last_request_times) > 500:
+            cutoff = now - 3600
+            for item_key, item_time in list(last_request_times.items()):
+                if item_time < cutoff:
+                    last_request_times.pop(item_key, None)
+    return True
+
+
+def create_admin_session():
+    token = secrets.token_urlsafe(32)
+    expires_at = time.time() + ADMIN_SESSION_TTL_SECONDS
+    with admin_sessions_lock:
+        admin_sessions[token] = expires_at
+        cleanup_admin_sessions_locked()
+    return token, expires_at
+
+
+def cleanup_admin_sessions_locked():
+    now = time.time()
+    for token, expires_at in list(admin_sessions.items()):
+        if expires_at <= now:
+            admin_sessions.pop(token, None)
+
+
+def is_admin_token_valid(token):
+    if not token:
+        return False
+    with admin_sessions_lock:
+        cleanup_admin_sessions_locked()
+        return admin_sessions.get(token, 0) > time.time()
+
+
+def parse_song_id(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 # ==================== 前端页面 ====================
 
 # ==================== 路由 ====================
@@ -123,14 +188,18 @@ def index():
 def api_search():
     """搜索歌曲候选，不立即下载。"""
     try:
-        data = request.json
-        query = data.get('query', '').strip()
-        user_id = data.get('user_id', '')
+        data = request.json or {}
+        query = clean_text(data.get('query'), 100)
+        user_id = clean_text(data.get('user_id'), 64)
 
         print(f"[搜索] 收到请求: query={query}")
 
         if not query:
             return jsonify({'ok': False, 'error': '请输入歌名'})
+        if not user_id:
+            return jsonify({'ok': False, 'error': '用户标识无效'}), 400
+        if not check_rate_limit(user_id, 'search'):
+            return jsonify({'ok': False, 'error': '操作太快了，请稍后再试'}), 429
 
         # 检查每日限制
         count = queue_mgr.get_today_count(user_id)
@@ -168,13 +237,17 @@ def api_search():
 def api_request():
     """下载选中的候选并加入队列。"""
     try:
-        data = request.json
+        data = request.json or {}
         candidate = data.get('candidate') or {}
-        user_id = data.get('user_id', '')
-        user_name = data.get('user_name', '匿名')
+        user_id = clean_text(data.get('user_id'), 64)
+        user_name = clean_text(data.get('user_name'), 20, '匿名')
 
         if not candidate.get('id'):
             return jsonify({'ok': False, 'error': '请选择歌曲'})
+        if not user_id:
+            return jsonify({'ok': False, 'error': '用户标识无效'}), 400
+        if not check_rate_limit(user_id, 'request'):
+            return jsonify({'ok': False, 'error': '操作太快了，请稍后再试'}), 429
 
         count = queue_mgr.get_today_count(user_id)
         if count >= MAX_SONGS_PER_USER_PER_DAY:
@@ -273,18 +346,28 @@ def api_history():
 @app.route('/api/admin/login', methods=['POST'])
 def api_admin_login():
     """管理员登录，验证密码"""
-    data = request.json
+    data = request.json or {}
     password = data.get('password', '')
     if password == ADMIN_PASSWORD:
-        return jsonify({'ok': True, 'token': ADMIN_PASSWORD})
+        token, expires_at = create_admin_session()
+        return jsonify({'ok': True, 'token': token, 'expires_at': expires_at})
     return jsonify({'ok': False, 'error': '密码错误'}), 401
+
+
+@app.route('/api/admin/logout', methods=['POST'])
+def api_admin_logout():
+    """管理员登出，立即使当前 token 失效。"""
+    token = request.headers.get('X-Admin-Token', '')
+    with admin_sessions_lock:
+        admin_sessions.pop(token, None)
+    return jsonify({'ok': True})
 
 
 @app.route('/api/remove', methods=['POST'])
 def api_remove():
     """从队列移除歌曲（管理员可删任意，普通用户只能删自己的）"""
-    data = request.json
-    song_id = data.get('song_id')
+    data = request.json or {}
+    song_id = parse_song_id(data.get('song_id'))
     user_id = data.get('user_id', '')
 
     if song_id:
@@ -311,8 +394,8 @@ def api_move_top():
     if admin_err:
         return admin_err
 
-    data = request.json
-    song_id = data.get('song_id')
+    data = request.json or {}
+    song_id = parse_song_id(data.get('song_id'))
     if song_id:
         queue_mgr.move_to_top(song_id)
     return jsonify({'ok': True})

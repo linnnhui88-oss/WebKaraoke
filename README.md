@@ -90,6 +90,8 @@ WebKaraoke/
 | `CACHE_MAX_AGE_DAYS` | 下载音频缓存最大保留天数 | 14 |
 | `BLUETOOTH_SPEAKER` | 蓝牙音响设备名 | 空(默认设备) |
 | `WEBKARAOKE_ADMIN_PASSWORD` | 管理员密码环境变量 | 123456 |
+| `ADMIN_SESSION_TTL_SECONDS` | 管理员登录有效期(秒) | 43200 |
+| `REQUEST_RATE_LIMIT_SECONDS` | 同一用户/IP 同类请求最小间隔(秒) | 3 |
 | `PORT` | 服务端口 | 9800 |
 
 ### 配置蓝牙音响

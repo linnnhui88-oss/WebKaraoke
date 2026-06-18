@@ -40,6 +40,12 @@ import os
 
 ADMIN_PASSWORD = os.environ.get("WEBKARAOKE_ADMIN_PASSWORD", "123456")
 
+# 管理员登录会话有效期（秒）
+ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60
+
+# 同一用户/IP 发起搜索或下载请求的最小间隔（秒）
+REQUEST_RATE_LIMIT_SECONDS = 3
+
 # ========== 网络配置 ==========
 
 # 服务监听端口

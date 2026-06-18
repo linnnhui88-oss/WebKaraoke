@@ -417,6 +417,11 @@ let userId = localStorage.getItem('userId') || generateUserId();
             if (isAdmin) {
                 // 登出
                 if (confirm('确定要退出管理员账号吗？')) {
+                    const token = localStorage.getItem('adminToken') || '';
+                    fetch('/api/admin/logout', {
+                        method: 'POST',
+                        headers: {'X-Admin-Token': token}
+                    }).catch(() => {});
                     localStorage.removeItem('adminToken');
                     isAdmin = false;
                     updateAdminUI();

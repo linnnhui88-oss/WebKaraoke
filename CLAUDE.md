@@ -59,6 +59,8 @@ python app.py
 | `CACHE_MAX_SIZE_MB` | 下载音频缓存最大占用空间(MB) | 2048 |
 | `CACHE_MAX_AGE_DAYS` | 下载音频缓存最大保留天数 | 14 |
 | `BLUETOOTH_SPEAKER` | 蓝牙音响设备名 | 空(默认设备) |
+| `ADMIN_SESSION_TTL_SECONDS` | 管理员登录有效期(秒) | 43200 |
+| `REQUEST_RATE_LIMIT_SECONDS` | 同一用户/IP 同类请求最小间隔(秒) | 3 |
 
 ## 功能特性
 
