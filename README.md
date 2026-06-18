@@ -36,6 +36,8 @@ pip install -r requirements.txt
 $env:WEBKARAOKE_ADMIN_PASSWORD="你的强密码"
 ```
 
+也可以参考 `.env.example` 中的配置项手动设置环境变量。
+
 ### 2. 安装 mpv 播放器
 
 ```powershell
@@ -126,6 +128,13 @@ python -c "import soundcard; [print(s.name) for s in soundcard.all_speakers()]"
 3. 当前只允许一个下载任务，需要等待当前下载完成后再点下一首
 4. mpv 路径会自动搜索 scoop 安装路径
 5. 运行日志写入 `logs/app.log`，该目录不会提交到 Git
+
+## 诊断与回滚
+
+- 健康检查：浏览器打开 http://localhost:9800/api/health
+- 日志文件：查看 `logs/app.log`
+- 查看最近提交：`git log --oneline -10`
+- 回滚到某个阶段：`git revert <commit>`
 
 ## 常见问题
 

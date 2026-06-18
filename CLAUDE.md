@@ -41,6 +41,9 @@ scoop install mpv
 python app.py
 ```
 
+Windows 也可以直接运行 `start.bat`。管理员密码建议通过环境变量
+`WEBKARAOKE_ADMIN_PASSWORD` 设置，`.env.example` 提供了示例。
+
 ### 4. 使用
 - 浏览器打开 http://localhost:9800
 - 输入歌名，点击"点歌"
