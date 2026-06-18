@@ -2,6 +2,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
         localStorage.setItem('userId', userId);
         let logs = [];
         let isAdmin = !!localStorage.getItem('adminToken');
+        let searchCandidates = [];
         updateAdminUI();
 
         // 主题切换
@@ -76,6 +77,39 @@ let userId = localStorage.getItem('userId') || generateUserId();
             renderLogs();
         }
 
+        function formatDuration(seconds) {
+            if (!seconds) return '未知时长';
+            const mins = Math.floor(seconds / 60);
+            const secs = String(seconds % 60).padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function renderCandidates(candidates) {
+            const box = document.getElementById('searchResults');
+            searchCandidates = candidates || [];
+            if (searchCandidates.length === 0) {
+                box.classList.remove('active');
+                box.innerHTML = '';
+                return;
+            }
+
+            box.classList.add('active');
+            box.innerHTML = `
+                <ul class="candidate-list">
+                    ${searchCandidates.map((song, i) => `
+                        <li class="candidate-item">
+                            <img class="candidate-thumb" src="${escapeHtml(song.thumbnail || '')}" alt="">
+                            <div>
+                                <div class="candidate-title">${escapeHtml(song.name)}</div>
+                                <div class="candidate-meta">${escapeHtml(song.artist || '未知频道')} · ${escapeHtml(formatDuration(song.duration))}</div>
+                            </div>
+                            <button onclick="requestCandidate(${i})">点这首</button>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
+
         async function searchSong() {
             const input = document.getElementById('songInput');
             const btn = document.getElementById('searchBtn');
@@ -87,7 +121,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
             }
 
             btn.disabled = true;
-            btn.textContent = '下载中...';
+            btn.textContent = '搜索中...';
             addLog(`开始搜索: ${query}`, 'info');
 
             try {
@@ -104,13 +138,9 @@ let userId = localStorage.getItem('userId') || generateUserId();
                 const data = await resp.json();
 
                 if (data.ok) {
-                    addLog(`搜索成功: ${query}，正在下载...`, 'success');
-                    showToast(`🔄 ${query} 正在下载，完成后将自动加入队列`);
-                    input.value = '';
-                    // 等待下载完成后刷新队列
-                    setTimeout(() => refreshQueue(), 5000);
-                    setTimeout(() => refreshQueue(), 15000);
-                    setTimeout(() => refreshHistory(), 20000);
+                    renderCandidates(data.candidates || []);
+                    addLog(`搜索成功: ${query}，找到 ${(data.candidates || []).length} 个候选`, 'success');
+                    showToast('请选择要点的歌曲');
                 } else {
                     addLog(`搜索失败: ${data.error}`, 'error');
                     showToast(data.error || '点歌失败', true);
@@ -121,6 +151,43 @@ let userId = localStorage.getItem('userId') || generateUserId();
             } finally {
                 btn.disabled = false;
                 btn.textContent = '🎵 点歌';
+            }
+        }
+
+        async function requestCandidate(index) {
+            const candidate = searchCandidates[index];
+            if (!candidate) {
+                showToast('候选歌曲不存在，请重新搜索', true);
+                return;
+            }
+
+            addLog(`选择歌曲: ${candidate.name}`, 'info');
+            try {
+                const resp = await fetch('/api/request', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        candidate,
+                        user_id: userId,
+                        user_name: getUserName()
+                    })
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    renderCandidates([]);
+                    document.getElementById('songInput').value = '';
+                    addLog(`开始下载: ${candidate.name}`, 'success');
+                    showToast('正在下载，完成后将自动加入队列');
+                    setTimeout(() => refreshQueue(), 5000);
+                    setTimeout(() => refreshQueue(), 15000);
+                    setTimeout(() => refreshHistory(), 20000);
+                } else {
+                    addLog(`点歌失败: ${data.error}`, 'error');
+                    showToast(data.error || '点歌失败', true);
+                }
+            } catch (e) {
+                addLog(`网络错误: ${e.message}`, 'error');
+                showToast('网络错误，请重试', true);
             }
         }
 

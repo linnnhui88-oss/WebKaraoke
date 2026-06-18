@@ -106,6 +106,65 @@
             cursor: not-allowed;
         }
 
+        .search-results {
+            display: none;
+            margin: 12px 0 20px;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .candidate-list {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .candidate-item {
+            display: grid;
+            grid-template-columns: 72px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .candidate-thumb {
+            width: 72px;
+            height: 54px;
+            object-fit: cover;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.08);
+        }
+
+        .candidate-title {
+            font-weight: bold;
+            line-height: 1.35;
+        }
+
+        .candidate-meta {
+            margin-top: 4px;
+            color: var(--text-secondary);
+            font-size: 0.85em;
+        }
+
+        .candidate-item button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(233,69,96,0.18);
+            color: #e94560;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .candidate-item button:hover {
+            background: rgba(233,69,96,0.3);
+        }
+
         .current-play {
             background: var(--card-bg);
             border-radius: 15px;
@@ -544,6 +603,17 @@
             }
             .search-box {
                 flex-direction: column;
+            }
+            .candidate-item {
+                grid-template-columns: 64px 1fr;
+            }
+            .candidate-item button {
+                grid-column: 1 / -1;
+                width: 100%;
+            }
+            .candidate-thumb {
+                width: 64px;
+                height: 48px;
             }
             .stats {
                 flex-direction: column;

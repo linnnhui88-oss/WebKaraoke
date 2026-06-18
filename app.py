@@ -66,14 +66,13 @@ def index():
 
 @app.route('/api/search', methods=['POST'])
 def api_search():
-    """搜索并点歌"""
+    """搜索歌曲候选，不立即下载。"""
     try:
         data = request.json
         query = data.get('query', '').strip()
         user_id = data.get('user_id', '')
-        user_name = data.get('user_name', '匿名')
 
-        print(f"[搜索] 收到请求: query={query}, user={user_name}")
+        print(f"[搜索] 收到请求: query={query}")
 
         if not query:
             return jsonify({'ok': False, 'error': '请输入歌名'})
@@ -93,34 +92,13 @@ def api_search():
                 'error': '正在下载中，请稍候再试...'
             })
 
-        # 在后台线程中搜索和下载
-        def do_search():
-            result = searcher.search(query)
-            if result:
-                # 检查播放器和队列状态
-                was_empty = len(queue_mgr.get_queue()) == 0 and not player.is_playing
-
-                song = queue_mgr.add_to_queue(
-                    user_id=user_id,
-                    song_name=result['name'],
-                    artist=result['artist'],
-                    url=result['url'],
-                    user_name=user_name
-                )
-                if song:
-                    # 只有队列为空且没有在播放时，才立即播放
-                    if was_empty:
-                        player.skip_event.set()
-                        print(f"[搜索] 立即播放: {result['name']}")
-                    else:
-                        print(f"[搜索] 已加入队列: {result['name']}")
-
-        thread = threading.Thread(target=do_search, daemon=True)
-        thread.start()
+        candidates = searcher.search_candidates(query, limit=5)
+        if not candidates:
+            return jsonify({'ok': False, 'error': '没有找到可用歌曲'})
 
         return jsonify({
             'ok': True,
-            'message': '正在搜索和下载，请稍候...',
+            'candidates': candidates,
             'remaining': queue_mgr.get_today_remaining(user_id)
         })
 
@@ -129,6 +107,65 @@ def api_search():
         print(f"[搜索] 异常: {e}")
         traceback.print_exc()
         return jsonify({'ok': False, 'error': f'搜索失败: {str(e)}'}), 500
+
+
+@app.route('/api/request', methods=['POST'])
+def api_request():
+    """下载选中的候选并加入队列。"""
+    try:
+        data = request.json
+        candidate = data.get('candidate') or {}
+        user_id = data.get('user_id', '')
+        user_name = data.get('user_name', '匿名')
+
+        if not candidate.get('id'):
+            return jsonify({'ok': False, 'error': '请选择歌曲'})
+
+        count = queue_mgr.get_today_count(user_id)
+        if count >= MAX_SONGS_PER_USER_PER_DAY:
+            return jsonify({
+                'ok': False,
+                'error': f'你今天已经点了 {count} 首歌，达到上限了！'
+            })
+
+        if searcher._downloading:
+            return jsonify({
+                'ok': False,
+                'error': '正在下载中，请稍候再试...'
+            })
+
+        def do_download():
+            result = searcher.download_candidate(candidate)
+            if result:
+                was_empty = len(queue_mgr.get_queue()) == 0 and not player.is_playing
+                song = queue_mgr.add_to_queue(
+                    user_id=user_id,
+                    song_name=result['name'],
+                    artist=result['artist'],
+                    url=result['url'],
+                    user_name=user_name
+                )
+                if song:
+                    if was_empty:
+                        player.skip_event.set()
+                        print(f"[搜索] 立即播放: {result['name']}")
+                    else:
+                        print(f"[搜索] 已加入队列: {result['name']}")
+
+        thread = threading.Thread(target=do_download, daemon=True)
+        thread.start()
+
+        return jsonify({
+            'ok': True,
+            'message': '正在下载，完成后将自动加入队列',
+            'remaining': queue_mgr.get_today_remaining(user_id)
+        })
+
+    except Exception as e:
+        import traceback
+        print(f"[点歌] 异常: {e}")
+        traceback.print_exc()
+        return jsonify({'ok': False, 'error': f'点歌失败: {str(e)}'}), 500
 
 
 @app.route('/api/queue', methods=['GET'])
