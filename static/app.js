@@ -37,6 +37,14 @@ let userId = localStorage.getItem('userId') || generateUserId();
             return document.getElementById('userName').value.trim() || '匿名';
         }
 
+        function getRequestHeaders(includeJson = false) {
+            const headers = includeJson ? {'Content-Type': 'application/json'} : {};
+            if (isAdmin) {
+                headers['X-Admin-Token'] = localStorage.getItem('adminToken') || '';
+            }
+            return headers;
+        }
+
         function escapeHtml(value) {
             return String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -229,7 +237,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
             try {
                 const resp = await fetch('/api/search', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: getRequestHeaders(true),
                     body: JSON.stringify({
                         query: query,
                         user_id: userId,
@@ -269,7 +277,7 @@ let userId = localStorage.getItem('userId') || generateUserId();
             try {
                 const resp = await fetch('/api/request', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: getRequestHeaders(true),
                     body: JSON.stringify({
                         candidate,
                         user_id: userId,
@@ -299,7 +307,9 @@ let userId = localStorage.getItem('userId') || generateUserId();
 
         async function refreshQueue() {
             try {
-                const resp = await fetch(`/api/queue?user_id=${encodeURIComponent(userId)}`);
+                const resp = await fetch(`/api/queue?user_id=${encodeURIComponent(userId)}`, {
+                    headers: getRequestHeaders()
+                });
                 const data = await resp.json();
                 setOnlineStatus(true);
 

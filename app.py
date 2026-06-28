@@ -66,6 +66,11 @@ def require_admin():
     return None
 
 
+def request_is_admin():
+    """当前请求是否携带有效管理员 token。"""
+    return is_admin_token_valid(request.headers.get('X-Admin-Token', ''))
+
+
 # ==================== 初始化 ====================
 
 app = Flask(__name__)
@@ -220,8 +225,9 @@ def api_search():
             return jsonify({'ok': False, 'error': '操作太快了，请稍后再试'}), 429
 
         # 检查每日限制
+        is_admin = request_is_admin()
         count = queue_mgr.get_today_count(user_id)
-        if count >= MAX_SONGS_PER_USER_PER_DAY:
+        if not is_admin and count >= MAX_SONGS_PER_USER_PER_DAY:
             return jsonify({
                 'ok': False,
                 'error': f'你今天已经点了 {count} 首歌，达到上限了！'
@@ -241,7 +247,7 @@ def api_search():
         return jsonify({
             'ok': True,
             'candidates': candidates,
-            'remaining': queue_mgr.get_today_remaining(user_id)
+            'remaining': '∞' if is_admin else queue_mgr.get_today_remaining(user_id)
         })
 
     except Exception as e:
@@ -267,8 +273,9 @@ def api_request():
         if not check_rate_limit(user_id, 'request'):
             return jsonify({'ok': False, 'error': '操作太快了，请稍后再试'}), 429
 
+        is_admin = request_is_admin()
         count = queue_mgr.get_today_count(user_id)
-        if count >= MAX_SONGS_PER_USER_PER_DAY:
+        if not is_admin and count >= MAX_SONGS_PER_USER_PER_DAY:
             return jsonify({
                 'ok': False,
                 'error': f'你今天已经点了 {count} 首歌，达到上限了！'
@@ -296,7 +303,8 @@ def api_request():
                     song_name=result['name'],
                     artist=result['artist'],
                     url=result['url'],
-                    user_name=user_name
+                    user_name=user_name,
+                    unlimited=is_admin
                 )
                 if song:
                     update_task(task['id'], 'queued', '已加入播放队列', song_id=song['id'])
@@ -317,7 +325,7 @@ def api_request():
             'ok': True,
             'task': public_task(task),
             'message': '正在下载，完成后将自动加入队列',
-            'remaining': queue_mgr.get_today_remaining(user_id)
+            'remaining': '∞' if is_admin else queue_mgr.get_today_remaining(user_id)
         })
 
     except Exception as e:
@@ -345,10 +353,14 @@ def api_tasks():
 def api_queue():
     """查看当前队列"""
     user_id = request.args.get('user_id', '')
+    is_admin = request_is_admin()
+    stats = queue_mgr.get_stats(user_id)
+    if is_admin:
+        stats['remaining'] = '∞'
     return jsonify({
         'queue': queue_mgr.get_queue(),
         'current': player.get_status(),
-        'stats': queue_mgr.get_stats(user_id)
+        'stats': stats
     })
 
 

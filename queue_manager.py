@@ -92,14 +92,14 @@ class QueueManager:
 
     # ==================== 队列操作 ====================
 
-    def add_to_queue(self, user_id, song_name, artist, url, user_name=None):
+    def add_to_queue(self, user_id, song_name, artist, url, user_name=None, unlimited=False):
         """
         添加歌曲到队列
         返回: song dict 或 None（如果被拒绝）
         """
         with self._lock:
             # 检查每日限制
-            if not self._check_daily_limit(user_id):
+            if not unlimited and not self._check_daily_limit(user_id):
                 return None
 
             # 检查队列是否已满
@@ -124,7 +124,8 @@ class QueueManager:
             self._save_queue()
 
             # 增加每日计数
-            self._increment_daily_count(user_id)
+            if not unlimited:
+                self._increment_daily_count(user_id)
 
             return song
 
